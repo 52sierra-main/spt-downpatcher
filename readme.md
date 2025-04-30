@@ -2,10 +2,10 @@
 ## [github repository](https://github.com/52sierra-main/spt-3.9.8downpatcher)
 
 scripts for creating binary patches for directories.  
-currently being used to create downpatches for latest tarkov client to make it compatible with spt 3.9  
+currently being used to create downpatches for latest tarkov client to make it compatible with older versions of spt.
 ### [latest patcher link](https://52sierra.net/patcher/)  
 This is probably what you're looking for.  
-Downgrades the latest tarkov client and installs spt 3.9.8.  
+Downgrades the latest tarkov client and installs older versions of spt.  
 Includes patcher, patchfiles and instructions.
 
 ### patch_generator  

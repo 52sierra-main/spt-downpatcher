@@ -1,15 +1,17 @@
 import os
 import sys
 import shutil
+import psutil
 import subprocess
+import tempfile, binascii
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from tkinter import Tk, filedialog
 import time
+from time import sleep
 import win32api # pip install pywin32
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm # pip install tqdm
-import winreg
 
 # in order to compile this and keep all the dialogues, in terminal, do [pyinstaller --console --onefile thisfilename.py]
 # --onefile make it into one executable and not a slurge of files of which many people start asking you dumb shit cuz they decided to double click that instead of the exe for whatever reason
@@ -25,6 +27,9 @@ def get_base_dir():
 # script_dir = os.path.dirname(os.path.abspath(__file__)) <-this was the original code when i was running off the python file itself
 script_dir = get_base_dir()
 
+# environment check
+workers = psutil.cpu_count(logical=False) -1
+
 # Paths
 patch_dir = os.path.join(script_dir, "patchfiles")
 hpatchz_path = os.path.join(script_dir, "bin", "x64", "hpatchz.exe")
@@ -34,40 +39,24 @@ def patch_check(dest_dir):
     """check for broken files"""
     typeA = ["tgikuvgt0dcv"]
     typeB = ["KpuvcnnaGHV"]
-    typeC = ["UQHVYCTG1YQY8654Pqfg1Oketquqhv1Ykpfqyu1EwttgpvXgtukqp1Wpkpuvcnn1GuecrgHtqoVctmqx"]
-    Dval = ["KpuvcnnNqecvkqp"]
-
     root = os.path.basename(os.path.normpath(dest_dir))
 
     Alist = ["".join([chr(ord(c) - 2) for c in name]) for name in typeA]
     Blist = ["".join([chr(ord(c) - 2) for c in name]) for name in typeB]
-    Clist = ["".join([chr(ord(c) - 2) for c in name]) for name in typeC]
-    Dlist = ["".join([chr(ord(c) - 2) for c in name]) for name in Dval]
 
     for A in Alist: 
         if os.path.exists(os.path.join(dest_dir, A)):
-            input("오류, 코드 3")
+            input("error, code 3")
             exit(1)
         
     if root in Blist:
-            input("오류, 코드 3")
+            input("error, code 3")
             exit(1)
 
     for B in Blist:
         if os.path.exists(B):
-            input("오류, 코드 3")
+            input("error, code 3")
             exit(1)
-
-    for C in Clist:
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, C) as key:
-                Cloc = winreg.QueryValueEx(key, Dlist[0])[0]
-                if Blist[0] in Cloc:
-                    input("오류, 코드 3")
-                    exit(1)
-        except FileNotFoundError:
-            pass
-
 
 # check client version
 def version_check(file_path):
@@ -79,25 +68,25 @@ def version_check(file_path):
         version = f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}.{ls & 0xFFFF}"
         return version
     except Exception as e:
-        print(f"오류, 타르코프 실행파일 버전 불러오기 실패, {file_path}. Error: {e}")
+        print(f"Error, failed to check tarkov exe version, {file_path}. Error: {e}")
         return None
 
 # use Tkinker to prompt the choose folder popup
 def choose_directory():
     root = Tk()
     root.withdraw()  # Hide the main Tkinter window
-    directory = filedialog.askdirectory(title="복사 붙여넣은 타르코프 폴더를 선택해주세요")
+    directory = filedialog.askdirectory(title="Select the copy-pasted tarkov client folder")
     if not directory:
-        input("아무것도 선택하지 않았습니다.")
+        input("Choose something.")
         exit(1)
     
     # logic for checking for EscapeFromTarkov.exe and it's version as a foolproof design
     executable = os.path.join(directory, "EscapeFromTarkov.exe") 
     if not executable:
-        input("선택한 폴더에 타르코프 실행파일이 없습니다. 올바른 폴더를 선택해주세요.")
+        input("Cannot detect escape from tarkov executable in the selected folder. Choose a correct target.")
         exit(1)
     if version_check(executable) != metadata['version']: # compares the version info on the metadata file and the exe file itself so ppl won't screw up
-        input("선택한 폴더의 클라이언트 버전이 패쳐와 호환되지 않습니다! 본섭 업데이트 상태와 패쳐의 최신버전 유무를 확인해주세요!")
+        input("The client version of the selected folder is not compatible with this patcher. Make sure that you have the latest tarkov client and patcher.")
         exit(1)
     return directory
 
@@ -107,7 +96,7 @@ def read_metadata(script_dir):
     
     info_file = next(Path(script_dir).glob("*.info"), None)
     if not info_file:
-        raise FileNotFoundError(f"메타데이터 파일 찾기 실패")
+        raise FileNotFoundError(f"Failed to find metadata file.")
 
     metadata = {}
     with open(info_file, "r", encoding="utf-8") as f:
@@ -119,6 +108,27 @@ def read_metadata(script_dir):
 
     return metadata
 
+def _recover_password(script_dir):
+    keyfile = os.path.join(script_dir, ".af.key")
+    with open(keyfile, "rb") as f:
+        blob = f.read()
+    return bytes(b ^ 0x5A for b in blob).decode()
+
+def apply_storage(script_dir, dest_dir):
+    archive = os.path.join(script_dir, "storage.sierra")
+    if not os.path.isfile(archive):
+        print("error, cannot find storage.")
+        return
+
+    pw   = _recover_password(script_dir)
+    sevenzip = os.path.join(script_dir, "bin", "7za.exe")
+
+    # 7z x archive -y -oDEST -pPASSWORD
+    subprocess.check_call(
+        [sevenzip, "x", "-y", f"-o{dest_dir}", f"-p{pw}", archive]
+    )
+    print("storage applied.")
+
 
 # apply a single patch using hpatchz
 def apply_patch(hdiff_file, dest_dir):
@@ -129,7 +139,7 @@ def apply_patch(hdiff_file, dest_dir):
 
     # check for destination file 
     if not dest_file.exists():
-        input(f"경고!: 타겟 파일을 찾지 못하였습니다! 타르코프 클라이언트를 확인하고 다시 복사해주시기 바랍니다! 파일: {dest_file} ")
+        input(f"Warning!: Failed to find a target file! Delete the pasted folder, integrity-check the tarkov files from the BSG launcher and retry the installation steps! filename: {dest_file} ")
         exit(1)
 
     # apply 
@@ -149,14 +159,14 @@ def process_patches(dest_dir):
     # Process all .hdiff files in the patch directory.
     hdiff_files = list(Path(patch_dir).rglob("*.hdiff"))
     if not hdiff_files:
-        input("패치 폴더 없음.")
+        input("Patch delta directory not found.")
         exit(1)
 
     print(f"Found {len(hdiff_files)} patch files. Applying...")
 
 # used tqdm to create a progress bar
     with tqdm(total=len(hdiff_files), desc="Processing files", unit="hdiff") as progress:
-        with ThreadPoolExecutor(max_workers=6) as executor:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [executor.submit(apply_patch, hdiff, dest_dir) for hdiff in hdiff_files]
             for future in as_completed(futures):
                 progress.update(1)
@@ -169,7 +179,7 @@ def process_patches(dest_dir):
 def finalize_patch(dest_dir):
     """ delete stuff and add additional files"""
     print("------------------")
-    print("파일 추가 및 제거")
+    print("Adjusting files...")
     print("------------------")
 
     # read the list of files to delete from delete_list.txt
@@ -180,7 +190,7 @@ def finalize_patch(dest_dir):
         with open(delete_list_file, "r", encoding="utf-8") as f:
             files_to_delete = [line.strip() for line in f if line.strip()]
     else:
-        input(f"제거 파일 리스트 없음: {delete_list_file}")
+        input(f"Delete list not found: {delete_list_file}")
         exit(1)
 
     # remove files 
@@ -189,62 +199,86 @@ def finalize_patch(dest_dir):
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                print(f"제거된 파일: {file_path}")
+                print(f"Deleted file: {file_path}")
             except Exception as e:
-                print(f"파일 제거 실패: {file_path}. Error: {e}")
+                print(f"Failed to delete file: {file_path}. Error: {e}")
         else:
-            print(f"파일 찾지 못함(무시하셔도 상관없습니다): {file_path}")
+            print(f"Failed to find file(non-important error): {file_path}")
 
     # remove empty directories
-    print("빈 폴더 제거중...")
+    print("Removing empty directories...")
     for root, dirs, files in os.walk(dest_dir, topdown=False):  # Process subdirectories first
         for directory in dirs:
             dir_path = os.path.join(root, directory)
             if not os.listdir(dir_path):  # Check if the directory is empty
                 try:
                     os.rmdir(dir_path)
-                    print(f"폴더 제거 완료: {dir_path}")
+                    print(f"Removed folder: {dir_path}")
                 except Exception as e:
-                    print(f"폴더 제거 실패 {dir_path}. Error: {e}")
+                    print(f"Failed to remove folder: {dir_path}. Error: {e}")
             else:
-                print(f"폴더 확인 완료: {dir_path}")
-
-    # copy additional files
-    additional_files_dir = os.path.join(script_dir, "additional_files")
-    if os.path.exists(additional_files_dir):
-        shutil.copytree(
-            additional_files_dir,
-            dest_dir,
-            dirs_exist_ok=True  # allows merging directories
-        )
-        print(f"추가파일 카피 {additional_files_dir} 에서 {dest_dir}")
-    else:
-        input(f"추가파일 폴더 찾지 못함: {additional_files_dir}")
-        exit(1)
+                print(f"Empty folders removed: {dir_path}")
 
 
 if __name__ == "__main__":
     try:
-        print("메타데이터 읽는 중...")
+        a = """
+
+░██████╗██╗███████╗██████╗░██████╗░░█████╗░
+██╔════╝██║██╔════╝██╔══██╗██╔══██╗██╔══██╗
+╚█████╗░██║█████╗░░██████╔╝██████╔╝███████║
+░╚═══██╗██║██╔══╝░░██╔══██╗██╔══██╗██╔══██║
+██████╔╝██║███████╗██║░░██║██║░░██║██║░░██║
+╚═════╝░╚═╝╚══════╝╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚═╝
+
+██╗███╗░░██╗░██████╗████████╗░█████╗░██╗░░░░░██╗░░░░░███████╗██████╗░
+██║████╗░██║██╔════╝╚══██╔══╝██╔══██╗██║░░░░░██║░░░░░██╔════╝██╔══██╗
+██║██╔██╗██║╚█████╗░░░░██║░░░███████║██║░░░░░██║░░░░░█████╗░░██████╔╝
+██║██║╚████║░╚═══██╗░░░██║░░░██╔══██║██║░░░░░██║░░░░░██╔══╝░░██╔══██╗
+██║██║░╚███║██████╔╝░░░██║░░░██║░░██║███████╗███████╗███████╗██║░░██║
+╚═╝╚═╝░░╚══╝╚═════╝░░░░╚═╝░░░╚═╝░░╚═╝╚══════╝╚══════╝╚══════╝╚═╝░░╚═╝"""
+        print("")
+        print("")
+        print("-----------------------------------------------------------------------------------------------------------------")
+        print("Clear mirror and calm water")
+        print(a)
+        print("")
+        print("-----------------------------------------------------------------------------------------------------------------")
+        print("")
+        sleep(2)
+        print("SPT installer made by 52sierra")
+        sleep(3)
+        print("")        
+        print("reading metadata...")
         time.sleep(1)
         metadata = read_metadata(script_dir)
         print(f"Version: {metadata['version']}")
         print(f"Title: {metadata['title']}")
         print(f"Description: {metadata['description']}")
-        print("엔터를 눌러 진행하세요")
+        print("press enter to continue")
         os.system("pause")
 
         # tkinter prompt
-        print("패치할 타르코프 폴더를 선택하세요:")
+        print("choose the pasted folder:")
         dest_dir = choose_directory()
         patch_check(dest_dir)
 
-        print("패치 적용중...")
+        print("applying patch...")
         process_patches(dest_dir)
-        print("패치적용완료")
-        print("마무리 중...")
+        print("patch complete")
+        print("finishing task...")
+        apply_storage(script_dir, dest_dir)
         finalize_patch(dest_dir)
-        print("모든 작업 완료, 즐거운 게임 되세요")
-        input("엔터를 눌러 종료하세요...")
+        print("process complete, good luck and have fun!")
+        print("")
+        print("")
+        print("-----------------------------------------")
+        print("Support the author:")
+        print("https://ko-fi.com/52sierra")
+        print("-----------------------------------------")
+        print("")
+        print("")
+        sleep(2)
+        input("press enter to finish...")
     except Exception as e:
         print(f"ERROR: {e}")

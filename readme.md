@@ -1,4 +1,4 @@
-#### discord: https://discordapp.com/users/52sierra  
+#### discord: [https://discord.gg/uKMW8PxE8s](https://discord.gg/uKMW8PxE8s)
 ## [github repository](https://github.com/52sierra-main/spt-3.9.8downpatcher)
 
 scripts for creating binary patches for directories.  

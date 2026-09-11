@@ -1,38 +1,69 @@
-#### discord: [https://discord.gg/uKMW8PxE8s](https://discord.gg/uKMW8PxE8s)
-## [github repository](https://github.com/52sierra-main/spt-3.9.8downpatcher)
+# Sierra SPT Downpatcher — Legacy Project
 
-scripts for creating binary patches for directories.  
-currently being used to create downpatches for latest tarkov client to make it compatible with older versions of spt.  
-### [latest patcher link](https://52sierra.net/patcher/)  
-This is probably what you're looking for.  
-Downgrades the latest tarkov client and installs older versions of spt.  
-Includes patcher, patchfiles and instructions.
+> **This repository contains the legacy version of the SPT downpatcher.**  
+> Development has moved to the newer **Sierra Installer/Patcher**, which is the recommended version for current use.
 
-### patch_generator  
-will compare the source and target directories recursively and create a patch directory which mimics the folder structure.  
-The path for these directories must be set manually(check the source code).  
-It will then create the binary diff files and place them where the target file's location is in the folder structure.  
-It also creates another replicate folder structure containing the files that exists in the target but not in the source so that it can be pasted in the patching process.  
-Another output is the delete list that makes a txt file listing the files that are in the source but not in the target so it can be used by the patcher for removal.  
-Check the script for all the files relative location settings.  
-The script uses multithreading using threadpoolexecutor.  
+## Looking for the current SPT installer / patcher?
 
-  
-### patcher  
-will apply the patch using the patch folder, delete list, and the additional folder created by the patch generator.  
-The .info metadata file must be created manually(just use notepad to create .txt and rename it into filename.info, check the source to see how it should look like).  
-The version line in the metadata file is used to check the patchability of the selected directory.  
-It should be placed in the root of the patcher folder.
-The patcher will prompt the user to choose the directory that needs patching with tkinter.  
-Once the user chooses the directory, the rest of the process including patching and copy-pasting the additional files is automatic.  
-It will auto delete the specified files(delete list).  
-This also is multithreaded using threadpoolexecutor.  
-You can use pyinstaller to build it into a portable exe file.  
-Recommended command is->  pyinstaller --onefile --console filename.py
-  
-  
-  
-the patcher folder package should look like this  
-  
-![image](https://github.com/user-attachments/assets/5225de4e-e724-48d3-a2b4-dfee109d7482)
+### [Open the current Sierra Installer/Patcher](https://52sierra.net/patcher/)
 
+The current installer/patcher is designed to install supported and archived SPT versions from a compatible Escape from Tarkov installation.
+
+It replaces this older downpatcher with a more complete workflow, including automatic source detection and copying, integrity verification, resumable web delivery, archived packages, prerequisite checks, logging, and a modern GUI.
+
+**Current source repository:**  
+[github.com/52sierra-main/sierra_spt_patcher](https://github.com/52sierra-main/sierra_spt_patcher)
+
+**Support / Discord:**  
+[discord.gg/uKMW8PxE8s](https://discord.gg/uKMW8PxE8s)
+
+---
+
+## About this legacy repository
+
+This project was the original **SPT downpatcher / SPT downgrader** used to create and apply binary patches between different Escape from Tarkov client versions for compatibility with older SPT releases.
+
+It contains two main Python tools:
+
+- `patch_generator.py` — compares source and target directory trees and produces binary patch data, additional files, and a delete list.
+- `patcher.py` — applies those generated patches to a selected directory and handles additional/deleted files automatically.
+
+This code remains available as a historical reference, but it is **not the recommended installer for current SPT use**.
+
+For current releases, archived-version installation, troubleshooting, and support, use the Sierra Installer/Patcher linked above.
+
+---
+
+## Legacy patch generator
+
+`patch_generator.py` recursively compares a source directory with a target directory and builds a patch package that mirrors the target folder structure.
+
+For files that changed, it creates binary diff files in the corresponding relative locations. Files that exist only in the target are copied into a separate additional-files tree, while files that exist only in the source are recorded in a delete list for removal during patching.
+
+The legacy generator requires its source/output paths to be configured manually in the script. Patch generation uses `ThreadPoolExecutor` for parallel processing.
+
+## Legacy patcher
+
+`patcher.py` applies the generated patch directory, copies additional files, and processes the delete list.
+
+The user selects the directory to patch through a Tkinter folder picker, after which the patching process is automated.
+
+The legacy package also uses a manually created `.info` metadata file for basic client-version compatibility checking. This workflow has been superseded by the newer Sierra Installer/Patcher.
+
+The old script can be packaged as a portable executable with PyInstaller, for example:
+
+```text
+pyinstaller --onefile --console patcher.py
+```
+
+Historical package layout example:
+
+![Legacy patcher folder layout](https://github.com/user-attachments/assets/5225de4e-e724-48d3-a2b4-dfee109d7482)
+
+---
+
+## Project status
+
+This repository is retained for legacy/reference purposes. New development and releases are maintained in the current Sierra Installer/Patcher repository.
+
+Sierra Installer/Patcher is an independent community project and is not affiliated with or endorsed by Battlestate Games or the SPT project.
